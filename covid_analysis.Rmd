@@ -1,0 +1,201 @@
+---
+title: "Covid Project"
+author: "James Gabriel"
+date: "`r Sys.Date()`"
+output: html_document
+---
+## Covid Data Analysis
+
+The dataset of our study contains daily & cumulative number of COVID-19 tests conducted, number of positive, hospitalized, recovered & death cases reported by country. In details here are the columns in the dataset:
+
+1. Date: Date
+1.  Continent_Name: Continent names
+1. Two_Letter_Country_Code: Country codes
+1. Country_Region: Country names
+1. Province_State: States/province names; value is All States when state/provincial level data is not available
+1. positive: Cumulative number of positive cases reported.
+1. active: Number of active cases on that day.
+1. hospitalized: Cumulative number of hospitalized cases reported.
+1. hospitalizedCurr: Number of actively hospitalized cases on that day.
+1. recovered: Cumulative number of recovered cases reported.
+1. death: Cumulative number of deaths reported.
+1. total_tested: Cumulative number of tests conducted.
+1. daily_tested: Number of tests conducted on the day; if daily data is unavailable, daily tested is averaged across number of days in between.
+1. daily_positive: Number of positive cases reported on the day; if daily data is unavailable, daily positive is averaged across number of days in.
+
+This analysis tries to provide an answer to this question: Which countries have had the highest number of positive cases against the number of tests?
+
+Firstly, we'd load in the `tidyverse` package as we would be using this for our analysis.
+```{r}
+library(tidyverse)
+```
+```{r}
+covid_df <- read_csv('covid.csv')
+```
+To have a brief idea of what the dataset looks like.
+
+```{r}
+dim(covid_df)
+```
+Displaying the column names.
+
+```{r}
+vector_cols <- colnames(covid_df)
+```
+```{r}
+vector_cols
+```
+```{r}
+class(covid_df$Country_Region)
+```
+```{r}
+class(vector_cols)
+```
+Let's diaplay a few rows of the dataset to explore it visually.
+
+```{r}
+head(covid_df)
+```
+The `glimpse` function is used to have an idea of the different data types of each column with a few samples.
+
+```{r}
+glimpse(covid_df)
+```
+
+Considering most of the data is either referring to a particular province or the entire country, it is necessary to have consistency to ensure proper analysis. For this reason, I'm filtering out the data to contain only rows where the `Province_State` says `All States`. 
+I would also be dropping the `Province_State` column.
+
+```{r}
+covid_df_all_states <- covid_df %>% filter(Province_State=='All States') %>% select(-Province_State)
+```
+```{r}
+covid_df_all_states
+```
+
+The data also contains daily and cummulative aggregation. To ensure consistency, I would be filtering for only columns that record daily changes.
+
+```{r}
+covid_df_all_states_daily <- covid_df_all_states %>% select(Date, Country_Region, active, hospitalizedCurr, daily_tested, daily_positive)
+```
+```{r}
+covid_df_all_states_daily
+```
+
+I then checked to see the total number of `tested`, `positive`, `active`, and `hospitalized` cases for each country present in the dataset. After this, I sorted the result in descending order and filtered to just the top 10 countries with the highest `tested` cases.
+
+```{r}
+covid_df_all_states_daily_sum <- covid_df_all_states_daily %>% 
+                                group_by(Country_Region) %>% 
+                                summarise(
+                                  tested = sum(daily_tested),
+                                  positive = sum(daily_positive),
+                                  active = sum(active),
+                                  hospitalized = sum(hospitalizedCurr)) %>% 
+                                arrange(-tested)
+```
+
+```{r}
+covid_df_all_states_daily_sum
+```
+
+```{r}
+covid_top_10 <- head(covid_df_all_states_daily_sum, 10)
+```
+```{r}
+covid_top_10
+```
+Assigning each of the columns in the top 10 result to various vectors to use for further analysis.
+
+
+```{r}
+countries <- covid_top_10 %>% pull(Country_Region)
+
+tested_cases <- covid_top_10 %>% pull(tested)
+
+positive_cases <- covid_top_10 %>% pull(positive)
+
+active_cases <- covid_top_10 %>% pull(active)
+
+hospitalized_cases <- covid_top_10 %>% pull(hospitalized)
+```
+
+```{r}
+tested_cases
+```
+
+```{r}
+names(tested_cases)
+```
+Giving names to the values in the vector.
+
+```{r}
+names(positive_cases) <- countries
+names(active_cases) <- countries
+names(hospitalized_cases) <- countries
+```
+
+```{r}
+names(active_cases)
+```
+```{r}
+active_cases
+```
+
+To answer the question asked earlier, feature engineering had to be put in place to generate a new result that calculates the total number of positive cases divided by the tested cases to find the countries with the highest ratio.
+
+```{r}
+positive_cases/tested_cases
+```
+
+`United Kingdom`, `United States`, and `Turkey` took the lead with the highest ratios.
+
+```{r}
+positive_tested_top_3 <- positive_cases/tested_cases
+```
+```{r}
+positive_tested_top_3 <- positive_tested_top_3[c(7,1,5)]
+```
+```{r}
+positive_tested_top_3
+```
+
+A matrix was created to store this information.
+
+```{r}
+united_kingdom <- c(0.11, 1473672, 166909, 0, 0)
+united_states <- c(0.10, 17282363, 1877179, 0, 0)
+turkey <- c(0.08, 2031192, 163941, 2980960, 0)
+```
+```{r}
+covid_mat <- rbind(united_kingdom, united_states, turkey)
+```
+```{r}
+colnames(covid_mat) <- c("Ratio", "tested", "positive", "active", "hospitalized")
+```
+```{r}
+covid_mat
+```
+```{r}
+question <- "Which countries have had the highest number of positive cases against the number of tests?"
+```
+
+```{r}
+answer <- c("Positive tested cases" = positive_tested_top_3)
+```
+
+```{r}
+data_structure_list <- list( c(covid_df, covid_df_all_states, covid_df_all_states_daily, covid_top_10),
+                             covid_mat, c(vector_cols, countries))
+```
+
+```{r}
+covid_analysis_list <- list(question, answer, data_structure_list)
+```
+
+```{r}
+covid_analysis_list[[2]]
+```
+
+## Conclusion
+
+From the analysis, it was observed that the country with the highest number of positive cases against the number of tested cases was the `United Kingdom`, followed closely by the `United States` and then `Turkey`.
